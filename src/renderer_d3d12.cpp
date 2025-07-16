@@ -6600,7 +6600,14 @@ namespace bgfx { namespace d3d12
 		while (_bs.hasItem(_view) )
 		{
 			const BlitItem& blit = _bs.advance();
+			const TextureBlitData& coords = blit.un.textureBd;
 
+			if (!blit.isTextureBlit)
+				{
+					BX_WARN(false, "Buffer blit not supported by this backend");
+					continue;
+				}
+				
 			      TextureD3D12& src = m_textures[blit.m_src.idx];
 			const TextureD3D12& dst = m_textures[blit.m_dst.idx];
 
@@ -6628,27 +6635,27 @@ namespace bgfx { namespace d3d12
 			if (TextureD3D12::Texture3D == src.m_type)
 			{
 				D3D12_BOX box;
-				box.left   = blit.m_srcX;
-				box.top    = blit.m_srcY;
-				box.front  = blit.m_srcZ;
-				box.right  = blit.m_srcX + blit.m_width;
-				box.bottom = blit.m_srcY + blit.m_height;
-				box.back   = blit.m_srcZ + bx::uint32_imax(1, blit.m_depth);
+				box.left   = coords.m_srcX;
+				box.top    = coords.m_srcY;
+				box.front  = coords.m_srcZ;
+				box.right  = coords.m_srcX + coords.m_width;
+				box.bottom = coords.m_srcY + coords.m_height;
+				box.back   = coords.m_srcZ + bx::uint32_imax(1, coords.m_depth);
 
 				D3D12_TEXTURE_COPY_LOCATION dstLocation;
 				dstLocation.pResource = dst.m_ptr;
 				dstLocation.Type      = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-				dstLocation.SubresourceIndex = blit.m_dstMip;
+				dstLocation.SubresourceIndex = coords.m_dstMip;
 
 				D3D12_TEXTURE_COPY_LOCATION srcLocation;
 				srcLocation.pResource = src.m_ptr;
 				srcLocation.Type      = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-				srcLocation.SubresourceIndex = blit.m_srcMip;
+				srcLocation.SubresourceIndex = coords.m_srcMip;
 
 				m_commandList->CopyTextureRegion(&dstLocation
-					, blit.m_dstX
-					, blit.m_dstY
-					, blit.m_dstZ
+					, coords.m_dstX
+					, coords.m_dstY
+					, coords.m_dstZ
 					, &srcLocation
 					, &box
 					);
@@ -6656,38 +6663,38 @@ namespace bgfx { namespace d3d12
 			else
 			{
 				D3D12_BOX box;
-				box.left   = blit.m_srcX;
-				box.top    = blit.m_srcY;
+				box.left   = coords.m_srcX;
+				box.top    = coords.m_srcY;
 				box.front  = 0;
-				box.right  = blit.m_srcX + blit.m_width;
-				box.bottom = blit.m_srcY + blit.m_height;
+				box.right  = coords.m_srcX + coords.m_width;
+				box.bottom = coords.m_srcY + coords.m_height;
 				box.back   = 1;
 
 				const uint32_t srcZ = TextureD3D12::TextureCube == src.m_type
-					? blit.m_srcZ
+					? coords.m_srcZ
 					: 0
 					;
 				const uint32_t dstZ = TextureD3D12::TextureCube == dst.m_type
-					? blit.m_dstZ
+					? coords.m_dstZ
 					: 0
 					;
 
 				D3D12_TEXTURE_COPY_LOCATION dstLocation;
 				dstLocation.pResource = dst.m_ptr;
 				dstLocation.Type      = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-				dstLocation.SubresourceIndex = dstZ*dst.m_numMips+blit.m_dstMip;
+				dstLocation.SubresourceIndex = dstZ*dst.m_numMips+coords.m_dstMip;
 
 				D3D12_TEXTURE_COPY_LOCATION srcLocation;
 				srcLocation.pResource = NULL != src.m_singleMsaa ? src.m_singleMsaa : src.m_ptr;
 				srcLocation.Type      = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-				srcLocation.SubresourceIndex = srcZ*src.m_numMips+blit.m_srcMip;
+				srcLocation.SubresourceIndex = srcZ*src.m_numMips+coords.m_srcMip;
 
 				const bool depthStencil = bimg::isDepth(bimg::TextureFormat::Enum(src.m_textureFormat) );
 
 				m_commandList->CopyTextureRegion(
 					  &dstLocation
-					, blit.m_dstX
-					, blit.m_dstY
+					, coords.m_dstX
+					, coords.m_dstY
 					, 0
 					, &srcLocation
 					, depthStencil ? NULL : &box

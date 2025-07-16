@@ -1450,7 +1450,9 @@ namespace bgfx
 			return;
 		}
 
-		BlitItem& bi = m_frame->m_blitItem[blitItemIdx];
+		BlitItem& bii = m_frame->m_blitItem[blitItemIdx];
+		TextureBlitData & bi = bii.un.textureBd;
+		
 		bi.m_srcX   = _srcX;
 		bi.m_srcY   = _srcY;
 		bi.m_srcZ   = _srcZ;
@@ -1462,8 +1464,10 @@ namespace bgfx
 		bi.m_depth  = _depth;
 		bi.m_srcMip = _srcMip;
 		bi.m_dstMip = _dstMip;
-		bi.m_src    = _src;
-		bi.m_dst    = _dst;
+		
+		bii.m_src     = _src;
+		bii.m_dst     = _dst;
+		bii.isTextureBlit = true;
 
 		BlitKey key;
 		key.m_view = _id;
@@ -1471,6 +1475,33 @@ namespace bgfx
 		m_frame->m_blitKeys[blitItemIdx] = key.encode();
 	}
 
+	void EncoderImpl::blit(ViewId _id, Handle _dst, uint32_t _dstOffsetInBytes, Handle _src, uint32_t _srcOffsetInBytes, uint32_t _count)
+	{
+		BX_WARN(m_frame->m_numBlitItems < BGFX_CONFIG_MAX_BLIT_ITEMS
+			, "Exceed number of available blit items per frame. BGFX_CONFIG_MAX_BLIT_ITEMS is %d. Skipping blit."
+			, BGFX_CONFIG_MAX_BLIT_ITEMS
+			);
+		if (m_frame->m_numBlitItems < BGFX_CONFIG_MAX_BLIT_ITEMS)
+		{
+			uint16_t item = m_frame->m_numBlitItems++;
+
+			BlitItem& bii = m_frame->m_blitItem[item];
+			BufferBlitData & bi = bii.un.bufferBd;
+			bi.m_srcOffset = _srcOffsetInBytes;
+			bi.m_dstOffset = _dstOffsetInBytes;
+			bi.m_count = _count;
+			
+			bii.m_src = _src;
+			bii.m_dst = _dst;
+			bii.isTextureBlit = false;
+
+			BlitKey key;
+			key.m_view = _id;
+			key.m_item = item;
+			m_frame->m_blitKeys[item] = key.encode();
+		}
+	}
+	
 	void Frame::sort()
 	{
 		BGFX_PROFILER_SCOPE("bgfx/Sort", kColorSubmit);
@@ -4219,6 +4250,30 @@ namespace bgfx
 
 		BGFX_ENCODER(blit(_id, _dst, _dstMip, _dstX, _dstY, _dstZ, _src, _srcMip, _srcX, _srcY, _srcZ, width, height, depth) );
 	}
+	
+	void Encoder::blit(ViewId _id, Handle _dst, uint32_t _dstOffsetInBytes, Handle _src, uint32_t _srcOffsetInBytes, uint32_t _count)
+	{
+		#warning This is ugly and probably not the correct place to do this
+		// get the underlying vertex/index buffers
+		if (_src.getType() == Handle::Enum::DynamicVertexBuffer) {
+			DynamicVertexBuffer& dvb = s_ctx->m_dynamicVertexBuffers[_src.idx];
+			_src.idx = dvb.m_handle.idx;
+			}
+		if (_dst.getType() == Handle::Enum::DynamicVertexBuffer) {
+			DynamicVertexBuffer& dvb = s_ctx->m_dynamicVertexBuffers[_dst.idx];
+			_dst.idx = dvb.m_handle.idx;
+			}
+		if (_src.getType() == Handle::Enum::DynamicIndexBuffer) {
+			DynamicIndexBuffer& dib = s_ctx->m_dynamicIndexBuffers[_src.idx];
+			_src.idx = dib.m_handle.idx;
+			}
+		if (_dst.getType() == Handle::Enum::DynamicIndexBuffer) {
+			DynamicIndexBuffer& dib = s_ctx->m_dynamicIndexBuffers[_dst.idx];
+			_dst.idx = dib.m_handle.idx;
+			}
+		
+		BGFX_ENCODER(blit(_id, _dst, _dstOffsetInBytes, _src, _srcOffsetInBytes, _count) );
+	}
 
 #undef BGFX_ENCODER
 
@@ -5783,6 +5838,12 @@ namespace bgfx
 	{
 		BGFX_CHECK_ENCODER0();
 		s_ctx->m_encoder0->blit(_id, _dst, _dstMip, _dstX, _dstY, _dstZ, _src, _srcMip, _srcX, _srcY, _srcZ, _width, _height, _depth);
+	}
+	
+	void blit(ViewId _id, Handle _dst, uint32_t _dstOffsetInBytes, Handle _src, uint32_t _srcOffsetInBytes, uint32_t _count)
+	{
+		BGFX_CHECK_ENCODER0();
+		s_ctx->m_encoder0->blit(_id, _dst, _dstOffsetInBytes, _src, _srcOffsetInBytes, _count);
 	}
 
 	void requestScreenShot(FrameBufferHandle _handle, const char* _filePath)

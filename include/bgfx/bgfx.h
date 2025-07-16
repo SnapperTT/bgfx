@@ -25,7 +25,7 @@ namespace bx { struct AllocatorI; }
 
 /// BGFX
 namespace bgfx
-{
+{	
 	/// Fatal error enum.
 	///
 	/// @attention C99's equivalent binding is `bgfx_fatal_t`.
@@ -475,6 +475,120 @@ namespace bgfx
 	BGFX_HANDLE(UniformHandle)
 	BGFX_HANDLE(VertexBufferHandle)
 	BGFX_HANDLE(VertexLayoutHandle)
+	
+	///
+	struct Handle
+	{
+		///
+		struct TypeName
+		{
+			const char* abrvName;
+			const char* fullName;
+		};
+
+		///
+		enum Enum
+		{
+			DynamicIndexBuffer,
+			DynamicVertexBuffer,
+			FrameBuffer,
+			IndexBuffer,
+			IndirectBuffer,
+			OcclusionQuery,
+			Program,
+			Shader,
+			Texture,
+			Uniform,
+			VertexBuffer,
+			VertexLayout,
+
+			Count
+		};
+
+		template<typename Ty>
+		static constexpr Enum toEnum();
+
+		constexpr Handle()
+			: idx(kInvalidHandle)
+			, type(Count)
+		{
+		}
+
+		template<typename Ty>
+		constexpr Handle(Ty _handle)
+			: idx(_handle.idx)
+			, type(uint16_t(toEnum<Ty>() ) )
+		{
+		}
+
+		template<typename Ty>
+		constexpr Ty to() const
+		{
+			if (type == toEnum<Ty>() )
+			{
+				return Ty{ idx };
+			}
+
+			//BX_ASSERT(type == toEnum<Ty>(), "Handle type %s, cannot be converted to %s."
+			//	, getTypeName().fullName
+			//	, getTypeName(toEnum<Ty>() ).fullName
+			//	);
+			return { kInvalidHandle };
+		}
+				
+		inline Enum getType() const
+		{
+			return Enum(type);
+		}
+
+		static const TypeName& getTypeName(Handle::Enum _enum);
+
+		inline const TypeName& getTypeName() const
+		{
+			return getTypeName(getType() );
+		}
+
+		inline bool isBuffer() const
+		{
+			return false
+				|| type == DynamicIndexBuffer
+				|| type == DynamicVertexBuffer
+				|| type == IndexBuffer
+				|| type == IndirectBuffer
+				|| type == VertexBuffer
+				;
+		}
+
+		inline bool isTexture() const
+		{
+			return type == Texture;
+		}
+
+		uint16_t idx;
+		uint16_t type;
+	};
+
+#define IMPLEMENT_HANDLE(_name)                                   \
+	template<>                                                    \
+	inline constexpr Handle::Enum Handle::toEnum<_name##Handle>() \
+	{                                                             \
+		return Handle::_name;                                     \
+	}                                                             \
+
+	IMPLEMENT_HANDLE(DynamicIndexBuffer);
+	IMPLEMENT_HANDLE(DynamicVertexBuffer);
+	IMPLEMENT_HANDLE(FrameBuffer);
+	IMPLEMENT_HANDLE(IndexBuffer);
+	IMPLEMENT_HANDLE(IndirectBuffer);
+	IMPLEMENT_HANDLE(OcclusionQuery);
+	IMPLEMENT_HANDLE(Program);
+	IMPLEMENT_HANDLE(Shader);
+	IMPLEMENT_HANDLE(Texture);
+	IMPLEMENT_HANDLE(Uniform);
+	IMPLEMENT_HANDLE(VertexBuffer);
+	IMPLEMENT_HANDLE(VertexLayout);
+
+#undef IMPLEMENT_HANDLE
 
 	/// Callback interface to implement application specific behavior.
 	/// Cached items are currently used for OpenGL and Direct3D 12 binary
@@ -1808,6 +1922,28 @@ namespace bgfx
 			, uint16_t _width = UINT16_MAX
 			, uint16_t _height = UINT16_MAX
 			, uint16_t _depth = UINT16_MAX
+			);
+			
+
+		/// Blit between two handles
+		///
+		/// @param[in] _id View id.
+		/// @param[in] _dst Destination buffer handle.
+		/// @param[in] _src Source buffer handle.
+		/// @param[in] _dstOffsetInBytes Write index in the destination buffer in bytes
+		/// @param[in] _srcOffsetInBytes Read index in the source buffer in bytes
+		/// @param[in] _count Number of bytes to copy. Pass UINT32_MAX to copy to end of buffer
+		///
+		/// @attention Availability depends on: `BGFX_CAPS_BUFFER_BLIT`.
+		/// @attention Blitting to or from Texture to Buffer depends on: `BGFX_CAPS_TEXTURE_BUFFER_BLIT`.
+		///
+		void blit(
+			  ViewId _id
+			, Handle _dst
+			, uint32_t _dstOffsetInBytes
+			, Handle _src
+			, uint32_t _srcOffsetInBytes
+			, uint32_t _count = UINT32_MAX
 			);
 	};
 
@@ -4394,6 +4530,27 @@ namespace bgfx
 		, uint16_t _depth = UINT16_MAX
 		);
 
+	/// Blit between two handles
+	///
+	/// @param[in] _id View id.
+	/// @param[in] _dst Destination buffer handle.
+	/// @param[in] _src Source buffer handle.
+	/// @param[in] _dstOffsetInBytes Write index in the destination buffer in bytes
+	/// @param[in] _srcOffsetInBytes Read index in the source buffer in bytes
+	/// @param[in] _count Number of bytes to copy. Pass UINT32_MAX to copy to end of buffer
+	///
+	/// @attention Availability depends on: `BGFX_CAPS_BUFFER_BLIT`.
+	/// @attention Blitting to or from Texture to Buffer depends on: `BGFX_CAPS_TEXTURE_BUFFER_BLIT`.
+	///
+	void blit(
+		  ViewId _id
+		, Handle _dst
+		, uint32_t _dstOffsetInBytes
+		, Handle _src
+		, uint32_t _srcOffsetInBytes
+		, uint32_t _count = UINT32_MAX
+		);
+	
 	/// Request screen shot of window back buffer.
 	///
 	/// @param[in] _handle Frame buffer handle. If handle is `BGFX_INVALID_HANDLE` request will be

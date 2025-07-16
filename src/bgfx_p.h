@@ -311,119 +311,6 @@ namespace bgfx
 	typedef uint32_t RenderItemCount;
 #endif // BGFX_CONFIG_MAX_DRAW_CALLS < (64<<10)
 
-	///
-	struct Handle
-	{
-		///
-		struct TypeName
-		{
-			const char* abrvName;
-			const char* fullName;
-		};
-
-		///
-		enum Enum
-		{
-			DynamicIndexBuffer,
-			DynamicVertexBuffer,
-			FrameBuffer,
-			IndexBuffer,
-			IndirectBuffer,
-			OcclusionQuery,
-			Program,
-			Shader,
-			Texture,
-			Uniform,
-			VertexBuffer,
-			VertexLayout,
-
-			Count
-		};
-
-		template<typename Ty>
-		static constexpr Enum toEnum();
-
-		constexpr Handle()
-			: idx(kInvalidHandle)
-			, type(Count)
-		{
-		}
-
-		template<typename Ty>
-		constexpr Handle(Ty _handle)
-			: idx(_handle.idx)
-			, type(uint16_t(toEnum<Ty>() ) )
-		{
-		}
-
-		template<typename Ty>
-		constexpr Ty to() const
-		{
-			if (type == toEnum<Ty>() )
-			{
-				return Ty{ idx };
-			}
-
-			BX_ASSERT(type == toEnum<Ty>(), "Handle type %s, cannot be converted to %s."
-				, getTypeName().fullName
-				, getTypeName(toEnum<Ty>() ).fullName
-				);
-			return { kInvalidHandle };
-		}
-
-		Enum getType() const
-		{
-			return Enum(type);
-		}
-
-		static const TypeName& getTypeName(Handle::Enum _enum);
-
-		const TypeName& getTypeName() const
-		{
-			return getTypeName(getType() );
-		}
-
-		bool isBuffer() const
-		{
-			return false
-				|| type == DynamicIndexBuffer
-				|| type == DynamicVertexBuffer
-				|| type == IndexBuffer
-				|| type == IndirectBuffer
-				|| type == VertexBuffer
-				;
-		}
-
-		bool isTexture() const
-		{
-			return type == Texture;
-		}
-
-		uint16_t idx;
-		uint16_t type;
-	};
-
-#define IMPLEMENT_HANDLE(_name)                                   \
-	template<>                                                    \
-	inline constexpr Handle::Enum Handle::toEnum<_name##Handle>() \
-	{                                                             \
-		return Handle::_name;                                     \
-	}                                                             \
-
-	IMPLEMENT_HANDLE(DynamicIndexBuffer);
-	IMPLEMENT_HANDLE(DynamicVertexBuffer);
-	IMPLEMENT_HANDLE(FrameBuffer);
-	IMPLEMENT_HANDLE(IndexBuffer);
-	IMPLEMENT_HANDLE(IndirectBuffer);
-	IMPLEMENT_HANDLE(OcclusionQuery);
-	IMPLEMENT_HANDLE(Program);
-	IMPLEMENT_HANDLE(Shader);
-	IMPLEMENT_HANDLE(Texture);
-	IMPLEMENT_HANDLE(Uniform);
-	IMPLEMENT_HANDLE(VertexBuffer);
-	IMPLEMENT_HANDLE(VertexLayout);
-
-#undef IMPLEMENT_HANDLE
 
 	inline bool isValid(const VertexLayout& _layout)
 	{
@@ -1931,7 +1818,7 @@ namespace bgfx
 		RenderCompute compute;
 	};
 
-	BX_ALIGN_DECL_CACHE_LINE(struct) BlitItem
+	struct TextureBlitData
 	{
 		uint16_t m_srcX;
 		uint16_t m_srcY;
@@ -1944,8 +1831,25 @@ namespace bgfx
 		uint16_t m_depth;
 		uint8_t  m_srcMip;
 		uint8_t  m_dstMip;
+	};
+	
+	struct BufferBlitData
+	{
+		uint32_t m_srcOffset;
+		uint32_t m_dstOffset;
+		uint32_t m_count;
+	};
+	
+	BX_ALIGN_DECL_CACHE_LINE(struct) BlitItem
+	{
+		union
+			{
+			TextureBlitData textureBd;
+			BufferBlitData bufferBd;
+			} un;
 		Handle m_src;
 		Handle m_dst;
+		bool isTextureBlit;
 	};
 
 	struct IndexBuffer
@@ -3070,6 +2974,8 @@ namespace bgfx
 		}
 
 		void blit(ViewId _id, TextureHandle _dst, uint8_t _dstMip, uint16_t _dstX, uint16_t _dstY, uint16_t _dstZ, TextureHandle _src, uint8_t _srcMip, uint16_t _srcX, uint16_t _srcY, uint16_t _srcZ, uint16_t _width, uint16_t _height, uint16_t _depth);
+
+		void blit(ViewId _id, Handle _dst, uint32_t _dstOffsetInBytes, Handle _src, uint32_t _srcOffsetInBytes, uint32_t _count);
 
 		Frame* m_frame;
 

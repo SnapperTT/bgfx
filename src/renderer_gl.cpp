@@ -2244,6 +2244,7 @@ namespace bgfx { namespace gl
 			, m_maxMsaa(0)
 			, m_vao(0)
 			, m_blitSupported(false)
+			, m_bufferBlitSupported(false)
 			, m_readBackSupported(BX_ENABLED(BGFX_CONFIG_RENDERER_OPENGL) )
 			, m_vaoSupport(false)
 			, m_samplerObjectSupport(false)
@@ -2891,11 +2892,15 @@ namespace bgfx { namespace gl
 				{
 					m_blitSupported = NULL != glCopyImageSubData;
 				}
-
+				
 				g_caps.supported |= m_blitSupported || BX_ENABLED(BGFX_GL_CONFIG_BLIT_EMULATION)
 					? BGFX_CAPS_TEXTURE_BLIT
 					: 0
 					;
+
+				m_bufferBlitSupported = NULL != glCopyBufferSubData;
+				
+				g_caps.supported |= m_bufferBlitSupported ? BGFX_CAPS_BUFFER_BLIT : 0;
 
 				g_caps.supported |= (m_readBackSupported || BX_ENABLED(BGFX_GL_CONFIG_TEXTURE_READ_BACK_EMULATION) )
 					? BGFX_CAPS_TEXTURE_READ_BACK
@@ -3333,6 +3338,7 @@ namespace bgfx { namespace gl
 
 		void createVertexBuffer(VertexBufferHandle _handle, const Memory* _mem, VertexLayoutHandle _layoutHandle, uint16_t _flags) override
 		{
+			bx::printf("PRINTF createVertexBuffer%i %i\n", _handle.idx, _mem->size);
 			m_vertexBuffers[_handle.idx].create(_mem->size, _mem->data, _layoutHandle, _flags);
 		}
 
@@ -3360,11 +3366,13 @@ namespace bgfx { namespace gl
 		{
 			VertexLayoutHandle layoutHandle = BGFX_INVALID_HANDLE;
 			m_vertexBuffers[_handle.idx].create(_size, NULL, layoutHandle, _flags);
+			bx::printf("PRINTF createDynamicVertexBuffer%i %i, internalSize: %i\n", _handle.idx, _size, m_vertexBuffers[_handle.idx].m_size);
 		}
 
 		void updateDynamicVertexBuffer(VertexBufferHandle _handle, uint32_t _offset, uint32_t _size, const Memory* _mem) override
 		{
 			m_vertexBuffers[_handle.idx].update(_offset, bx::uint32_min(_size, _mem->size), _mem->data);
+			bx::printf("PRINTF updateDynamicVertexBuffer%i sz: %i %i, offset: %i, stored size: %i\n", _handle.idx, _size, _mem->size, _offset, m_vertexBuffers[_handle.idx].m_size);
 		}
 
 		void destroyDynamicVertexBuffer(VertexBufferHandle _handle) override
@@ -4803,6 +4811,7 @@ namespace bgfx { namespace gl
 		GLuint m_vao;
 		uint16_t m_maxLabelLen;
 		bool m_blitSupported;
+		bool m_bufferBlitSupported;
 		bool m_readBackSupported;
 		bool m_vaoSupport;
 		bool m_samplerObjectSupport;
@@ -7409,25 +7418,95 @@ namespace bgfx { namespace gl
 			while (_bs.hasItem(_view) )
 			{
 				const BlitItem& bi = _bs.advance();
+				const TextureBlitData& coords = bi.un.textureBd;
 
+				if (!bi.isTextureBlit)
+				{
+					const BufferBlitData& copyInfo = bi.un.bufferBd;
+					if (!m_bufferBlitSupported)
+					{
+						BX_WARN(false, "buffer blit not supported!");
+						continue;
+					}
+					if (!(bi.m_src.isBuffer() && bi.m_src.isBuffer())) {
+						BX_WARN(false, "buffer blit requires both src and dst be buffers (not texutres or other handle types)");
+						continue;
+					}
+		
+					GLuint srcBuffGl = 0;
+					GLuint dstBuffGl = 0;
+					uint32_t maxSizeSrc = UINT32_MAX;
+					uint32_t maxSizeDst = UINT32_MAX;
+
+					// decode src/dst buffer types
+					switch (bi.m_src.getType())
+						{
+						case Handle::DynamicIndexBuffer:
+						case Handle::IndexBuffer:
+							srcBuffGl = m_indexBuffers[bi.m_src.idx].m_id;
+							maxSizeSrc = m_indexBuffers[bi.m_src.idx].m_size;
+							break;
+						case Handle::DynamicVertexBuffer:
+						case Handle::IndirectBuffer:
+						case Handle::VertexBuffer:
+							srcBuffGl = m_vertexBuffers[bi.m_src.idx].m_id;
+							maxSizeSrc = m_vertexBuffers[bi.m_src.idx].m_size;
+							break;
+						default:
+							// should never reach here as we're already checking src.isBuffer()
+							BX_WARN(false, "unsupported handle type");
+						}
+						
+					switch (bi.m_dst.getType())
+						{
+						case Handle::DynamicIndexBuffer:
+						case Handle::IndexBuffer:
+							dstBuffGl = m_indexBuffers[bi.m_dst.idx].m_id;
+							maxSizeDst = m_indexBuffers[bi.m_dst.idx].m_size;
+							break;
+						case Handle::DynamicVertexBuffer:
+						case Handle::IndirectBuffer:
+						case Handle::VertexBuffer:
+							dstBuffGl = m_vertexBuffers[bi.m_dst.idx].m_id;
+							maxSizeDst = m_vertexBuffers[bi.m_dst.idx].m_size;
+							break;
+						default:
+							// should never reach here as we're already checking src.isBuffer()
+							BX_WARN(false, "unsupported handle type");
+						}
+
+					if (srcBuffGl && dstBuffGl)
+					{
+						GL_CHECK( glBindBuffer(GL_COPY_READ_BUFFER, srcBuffGl) );
+						GL_CHECK( glBindBuffer(GL_COPY_WRITE_BUFFER, dstBuffGl) );
+						uint32_t maxWriteSize = maxSizeDst - copyInfo.m_dstOffset;
+						uint32_t maxReadSize = maxSizeSrc - copyInfo.m_srcOffset;
+						uint32_t size = bx::min(bx::min(copyInfo.m_count, maxWriteSize), maxReadSize);
+						bx::printf("PRINTF blit, bgfx id %i -> %i (glId %i -> %i)\n", bi.m_src.idx, bi.m_dst.idx, srcBuffGl, dstBuffGl);
+						bx::printf("PRINTF max sizes %i -> %i, rq: %i, final: %i\n", maxSizeSrc, maxSizeDst, copyInfo.m_count, size);
+						GL_CHECK( glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, copyInfo.m_srcOffset, copyInfo.m_dstOffset, size) );
+					}
+					continue;
+				}
+				
 				const TextureGL& src = m_textures[bi.m_src.idx];
 				const TextureGL& dst = m_textures[bi.m_dst.idx];
 
 				GL_CHECK(glCopyImageSubData(src.m_id
 					, src.m_target
-					, bi.m_srcMip
-					, bi.m_srcX
-					, bi.m_srcY
-					, bi.m_srcZ
+					, coords.m_srcMip
+					, coords.m_srcX
+					, coords.m_srcY
+					, coords.m_srcZ
 					, dst.m_id
 					, dst.m_target
-					, bi.m_dstMip
-					, bi.m_dstX
-					, bi.m_dstY
-					, bi.m_dstZ
-					, bi.m_width
-					, bi.m_height
-					, bx::uint32_imax(bi.m_depth, 1)
+					, coords.m_dstMip
+					, coords.m_dstX
+					, coords.m_dstY
+					, coords.m_dstZ
+					, coords.m_width
+					, coords.m_height
+					, bx::uint32_imax(coords.m_depth, 1)
 					) );
 				}
 		}
@@ -7436,11 +7515,18 @@ namespace bgfx { namespace gl
 			while (_bs.hasItem(_view) )
 			{
 				const BlitItem& bi = _bs.advance();
+				const TextureBlitData& coords = bi.un.textureBd;
+
+				if (!bi.isTextureBlit)
+					{
+						BX_WARN(false, "Buffer blit not supported by this backend");
+						continue;
+					}
 
 				const TextureGL& src = m_textures[bi.m_src.idx];
 				const TextureGL& dst = m_textures[bi.m_dst.idx];
 
-				BX_ASSERT(0 == bi.m_srcZ && 0 == bi.m_dstZ && 1 >= bi.m_depth
+				BX_ASSERT(0 == coords.m_srcZ && 0 == coords.m_dstZ && 1 >= coords.m_depth
 					, "Blitting 3D regions is not supported"
 					);
 
@@ -7453,7 +7539,7 @@ namespace bgfx { namespace gl
 					, GL_COLOR_ATTACHMENT0
 					, GL_TEXTURE_2D
 					, src.m_id
-					, bi.m_srcMip
+					, coords.m_srcMip
 					) );
 
 				GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
@@ -7464,13 +7550,13 @@ namespace bgfx { namespace gl
 				GL_CHECK(glBindTexture(GL_TEXTURE_2D, dst.m_id) );
 
 				GL_CHECK(glCopyTexSubImage2D(GL_TEXTURE_2D
-					, bi.m_dstMip
-					, bi.m_dstX
-					, bi.m_dstY
-					, bi.m_srcX
-					, bi.m_srcY
-					, bi.m_width
-					, bi.m_height
+					, coords.m_dstMip
+					, coords.m_dstX
+					, coords.m_dstY
+					, coords.m_srcX
+					, coords.m_srcY
+					, coords.m_width
+					, coords.m_height
 					) );
 
 				GL_CHECK(glDeleteFramebuffers(1, &fbo) );

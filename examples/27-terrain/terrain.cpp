@@ -254,6 +254,7 @@ ExampleTerrain(const char* _name, const char* _description, const char* _url)
 			break;
 
 		case 1: // Dynamic Vertex Buffer : Utilize dynamic vertex buffer to update terrain.
+		case 2: // Staging Buffer : Upload to a staging buffer then blit into target buffer.
 			updateTerrainMesh();
 
 			if (!bgfx::isValid(m_dvbh) )
@@ -271,9 +272,21 @@ ExampleTerrain(const char* _name, const char* _description, const char* _url)
 
 			mem = bgfx::makeRef(&m_terrain.m_indices[0], sizeof(uint16_t) * m_terrain.m_indexCount);
 			bgfx::update(m_dibh, 0, mem);
-			break;
+			
+			if (m_terrain.m_mode == 2)
+			{
+				if (!bgfx::isValid(m_vbh) || !bgfx::isValid(m_ibh) )
+				{
+					mem = bgfx::makeRef(NULL, sizeof(PosTexCoord0Vertex) * m_terrain.m_vertexCount);
+					m_vbh = bgfx::createVertexBuffer(mem, PosTexCoord0Vertex::ms_layout);
 
-		case 2: // Height Texture: Update a height texture that is sampled in the terrain vertex shader.
+					mem = bgfx::makeRef(NULL, sizeof(uint16_t) * m_terrain.m_indexCount);
+					m_ibh = bgfx::createIndexBuffer(mem);
+				}
+			}
+			
+			break;
+		case 3: // Height Texture: Update a height texture that is sampled in the terrain vertex shader.
 			if (!bgfx::isValid(m_vbh) || !bgfx::isValid(m_ibh) )
 			{
 				updateTerrainMesh();
@@ -418,7 +431,8 @@ ExampleTerrain(const char* _name, const char* _description, const char* _url)
 
 			m_terrain.m_dirty |= ImGui::RadioButton("Vertex Buffer", &m_terrain.m_mode, 0);
 			m_terrain.m_dirty |= ImGui::RadioButton("Dynamic Vertex Buffer", &m_terrain.m_mode, 1);
-			m_terrain.m_dirty |= ImGui::RadioButton("Height Texture", &m_terrain.m_mode, 2);
+			m_terrain.m_dirty |= ImGui::RadioButton("Blit Staging Buffer", &m_terrain.m_mode, 2);
+			m_terrain.m_dirty |= ImGui::RadioButton("Height Texture", &m_terrain.m_mode, 3);
 
 			ImGui::Separator();
 
@@ -442,10 +456,12 @@ ExampleTerrain(const char* _name, const char* _description, const char* _url)
 			}
 
 			// Update terrain.
+			bool terrainUpdated = false;
 			if (m_terrain.m_dirty)
 			{
 				updateTerrain();
 				m_terrain.m_dirty = false;
+				terrainUpdated = true;
 			}
 
 			// Set view 0 default viewport.
@@ -470,8 +486,29 @@ ExampleTerrain(const char* _name, const char* _description, const char* _url)
 				bgfx::setIndexBuffer(m_dibh);
 				bgfx::submit(0, m_terrainProgram);
 				break;
-
+				
 			case 2:
+				// Copy from DynamicVertexBuffer/DynamicIndexBuffer to static buffers
+				if (terrainUpdated && bgfx::getCaps()->supported & BGFX_CAPS_BUFFER_BLIT)
+				{
+					BX_ASSERT(bgfx::isValid(m_vbh), "m_vbh is invalid");
+					BX_ASSERT(bgfx::isValid(m_ibh), "m_ibh is invalid");
+					BX_ASSERT(bgfx::isValid(m_dvbh), "m_dvbh is invalid");
+					BX_ASSERT(bgfx::isValid(m_dibh), "m_dibh is invalid");
+					
+					bx::printf("PRINTF Ask for blit: m_vbh %i, m_dvbh %i!\n", m_vbh.idx, m_dvbh.idx);
+			
+					bgfx::blit(0, bgfx::Handle(m_vbh), 0, bgfx::Handle(m_dvbh), 0, sizeof(PosTexCoord0Vertex) * m_terrain.m_vertexCount);
+					bgfx::blit(0, bgfx::Handle(m_ibh), 0, bgfx::Handle(m_dibh), 0, sizeof(uint16_t) * m_terrain.m_indexCount);
+				}
+					
+				// Bind and draw the static buffers
+				bgfx::setVertexBuffer(0, m_vbh);
+				bgfx::setIndexBuffer(m_ibh);
+				bgfx::submit(0, m_terrainProgram);
+				break;
+
+			case 3:
 				bgfx::setVertexBuffer(0, m_vbh);
 				bgfx::setIndexBuffer(m_ibh);
 				bgfx::setTexture(0, s_heightTexture, m_heightTexture);
@@ -482,6 +519,7 @@ ExampleTerrain(const char* _name, const char* _description, const char* _url)
 			// Advance to next frame. Rendering thread will be kicked to
 			// process submitted rendering primitives.
 			bgfx::frame();
+			bx::printf("PRINTF FRAME!\n");
 
 			return true;
 		}

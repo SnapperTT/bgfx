@@ -4083,10 +4083,16 @@ BX_PRAGMA_DIAGNOSTIC_POP();
 		while (_bs.hasItem(_view) )
 		{
 			const BlitItem& blit = _bs.advance();
+			const TextureBlitData& coords = bi.un.textureBd;
+
+			if (!bi.isTextureBlit)
+				{
+					BX_WARN(false, "Buffer blit not supported by this backend");
+					continue;
+				}
 
 			const TextureMtl& src = m_textures[blit.m_src.idx];
 			const TextureMtl& dst = m_textures[blit.m_dst.idx];
-
 #if BX_PLATFORM_OSX
 			const bool readBack = !!(dst.m_flags & BGFX_TEXTURE_READ_BACK);
 #endif  // BX_PLATFORM_OSX
@@ -4097,12 +4103,12 @@ BX_PRAGMA_DIAGNOSTIC_POP();
 					  src.m_ptr
 					, 0
 					, 0
-					, MTLOriginMake(blit.m_srcX, blit.m_srcY, blit.m_srcZ)
-					, MTLSizeMake(blit.m_width, blit.m_height, bx::uint32_imax(blit.m_depth, 1) )
+					, MTLOriginMake(coords.m_srcX, coords.m_srcY, coords.m_srcZ)
+					, MTLSizeMake(coords.m_width, coords.m_height, bx::uint32_imax(coords.m_depth, 1) )
 					, dst.m_ptr
 					, 0
 					, 0
-					, MTLOriginMake(blit.m_dstX, blit.m_dstY, blit.m_dstZ)
+					, MTLOriginMake(coords.m_dstX, coords.m_dstY, coords.m_dstZ)
 					);
 #if BX_PLATFORM_OSX
 				if (m_hasSynchronizeResource && readBack)
@@ -4115,19 +4121,19 @@ BX_PRAGMA_DIAGNOSTIC_POP();
 			{
 				m_blitCommandEncoder.copyFromTexture(
 					  src.m_ptr
-					, blit.m_srcZ
-					, blit.m_srcMip
-					, MTLOriginMake(blit.m_srcX, blit.m_srcY, 0)
-					, MTLSizeMake(blit.m_width, blit.m_height, 1)
+					, coords.m_srcZ
+					, coords.m_srcMip
+					, MTLOriginMake(coords.m_srcX, coords.m_srcY, 0)
+					, MTLSizeMake(coords.m_width, coords.m_height, 1)
 					, dst.m_ptr
-					, blit.m_dstZ
-					, blit.m_dstMip
-					, MTLOriginMake(blit.m_dstX, blit.m_dstY, 0)
+					, coords.m_dstZ
+					, coords.m_dstMip
+					, MTLOriginMake(coords.m_dstX, coords.m_dstY, 0)
 					);
 #if BX_PLATFORM_OSX
 				if (m_hasSynchronizeResource && readBack)
 				{
-					m_blitCommandEncoder.synchronizeTexture(dst.m_ptr, 0, blit.m_dstMip);
+					m_blitCommandEncoder.synchronizeTexture(dst.m_ptr, 0, coords.m_dstMip);
 				}
 #endif  // BX_PLATFORM_OSX
 			}

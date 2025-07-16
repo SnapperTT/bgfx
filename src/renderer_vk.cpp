@@ -8892,6 +8892,13 @@ retry:
 		while (bs0.hasItem(_view) )
 		{
 			const BlitItem& blit = bs0.advance();
+			const TextureBlitData& coords = blit.un.textureBd;
+
+			if (!blit.isTextureBlit)
+				{
+					BX_WARN(false, "Buffer blit not supported by this backend");
+					continue;
+				}
 
 			TextureVK& src = m_textures[blit.m_src.idx];
 			TextureVK& dst = m_textures[blit.m_dst.idx];
@@ -8920,37 +8927,38 @@ retry:
 
 			VkImageCopy copyInfo;
 			copyInfo.srcSubresource.aspectMask     = src.m_aspectFlags;
-			copyInfo.srcSubresource.mipLevel       = blit.m_srcMip;
+			copyInfo.srcSubresource.mipLevel       = coords.m_srcMip;
 			copyInfo.srcSubresource.baseArrayLayer = 0;
 			copyInfo.srcSubresource.layerCount     = 1;
-			copyInfo.srcOffset.x = blit.m_srcX;
-			copyInfo.srcOffset.y = blit.m_srcY;
+			copyInfo.srcOffset.x = coords.m_srcX;
+			copyInfo.srcOffset.y = coords.m_srcY;
 			copyInfo.srcOffset.z = 0;
+			
 			copyInfo.dstSubresource.aspectMask     = dst.m_aspectFlags;
-			copyInfo.dstSubresource.mipLevel       = blit.m_dstMip;
+			copyInfo.dstSubresource.mipLevel       = coords.m_dstMip;
 			copyInfo.dstSubresource.baseArrayLayer = 0;
 			copyInfo.dstSubresource.layerCount     = 1;
-			copyInfo.dstOffset.x = blit.m_dstX;
-			copyInfo.dstOffset.y = blit.m_dstY;
+			copyInfo.dstOffset.x = coords.m_dstX;
+			copyInfo.dstOffset.y = coords.m_dstY;
 			copyInfo.dstOffset.z = 0;
-			copyInfo.extent.width  = blit.m_width;
-			copyInfo.extent.height = blit.m_height;
+			copyInfo.extent.width  = coords.m_width;
+			copyInfo.extent.height = coords.m_height;
 			copyInfo.extent.depth  = 1;
 
-			const uint32_t depth = bx::max<uint32_t>(1, blit.m_depth);
+			const uint32_t depth = bx::max<uint32_t>(1, coords.m_depth);
 
 			if (VK_IMAGE_VIEW_TYPE_3D == src.m_type)
 			{
 				BX_ASSERT(VK_IMAGE_VIEW_TYPE_3D == dst.m_type, "Can't blit between 2D and 3D image.");
 
-				copyInfo.srcOffset.z  = blit.m_srcZ;
-				copyInfo.dstOffset.z  = blit.m_dstZ;
+				copyInfo.srcOffset.z  = coords.m_srcZ;
+				copyInfo.dstOffset.z  = coords.m_dstZ;
 				copyInfo.extent.depth = depth;
 			}
 			else
 			{
-				copyInfo.srcSubresource.baseArrayLayer = blit.m_srcZ;
-				copyInfo.dstSubresource.baseArrayLayer = blit.m_dstZ;
+				copyInfo.srcSubresource.baseArrayLayer = coords.m_srcZ;
+				copyInfo.dstSubresource.baseArrayLayer = coords.m_dstZ;
 				copyInfo.srcSubresource.layerCount = depth;
 				copyInfo.dstSubresource.layerCount = depth;
 			}

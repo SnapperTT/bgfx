@@ -5637,27 +5637,34 @@ namespace bgfx { namespace d3d11
 		while (_bs.hasItem(_view) )
 		{
 			const BlitItem& blit = _bs.advance();
-
+			const TextureBlitData& coords = blit.un.textureBd;
+			
+			if (!blit.isTextureBlit)
+				{
+					BX_WARN(false, "Buffer blit not supported by this backend");
+					continue;
+				}
+			
 			const TextureD3D11& src = m_textures[blit.m_src.idx];
 			const TextureD3D11& dst = m_textures[blit.m_dst.idx];
 
 			if (TextureD3D11::Texture3D == src.m_type)
 			{
 				D3D11_BOX box;
-				box.left   = blit.m_srcX;
-				box.top    = blit.m_srcY;
-				box.front  = blit.m_srcZ;
-				box.right  = blit.m_srcX + blit.m_width;
-				box.bottom = blit.m_srcY + blit.m_height;
-				box.back   = blit.m_srcZ + bx::uint32_imax(1, blit.m_depth);
+				box.left   = coords.m_srcX;
+				box.top    = coords.m_srcY;
+				box.front  = coords.m_srcZ;
+				box.right  = coords.m_srcX + coords.m_width;
+				box.bottom = coords.m_srcY + coords.m_height;
+				box.back   = coords.m_srcZ + bx::uint32_imax(1, coords.m_depth);
 
 				deviceCtx->CopySubresourceRegion(dst.m_ptr
-					, blit.m_dstMip
-					, blit.m_dstX
-					, blit.m_dstY
-					, blit.m_dstZ
+					, coords.m_dstMip
+					, coords.m_dstX
+					, coords.m_dstY
+					, coords.m_dstZ
 					, src.m_ptr
-					, blit.m_srcMip
+					, coords.m_srcMip
 					, &box
 					);
 			}
@@ -5665,28 +5672,28 @@ namespace bgfx { namespace d3d11
 			{
 				bool depthStencil = bimg::isDepth(bimg::TextureFormat::Enum(src.m_textureFormat) );
 				BX_ASSERT(!depthStencil
-					||  (blit.m_width == bx::uint32_max(1, src.m_width >> blit.m_srcMip) && blit.m_height == bx::uint32_max(1, src.m_height >> blit.m_srcMip))
+					||  (coords.m_width == bx::uint32_max(1, src.m_width >> coords.m_srcMip) && coords.m_height == bx::uint32_max(1, src.m_height >> coords.m_srcMip))
 					, "When blitting depthstencil surface, source resolution must match destination."
 					);
 
 				D3D11_BOX box;
-				box.left   = blit.m_srcX;
-				box.top    = blit.m_srcY;
+				box.left   = coords.m_srcX;
+				box.top    = coords.m_srcY;
 				box.front  = 0;
-				box.right  = blit.m_srcX + blit.m_width;
-				box.bottom = blit.m_srcY + blit.m_height;
+				box.right  = coords.m_srcX + coords.m_width;
+				box.bottom = coords.m_srcY + coords.m_height;
 				box.back   = 1;
 
-				const uint32_t srcZ = blit.m_srcZ;
-				const uint32_t dstZ = blit.m_dstZ;
+				const uint32_t srcZ = coords.m_srcZ;
+				const uint32_t dstZ = coords.m_dstZ;
 
 				deviceCtx->CopySubresourceRegion(dst.m_ptr
-					, dstZ*dst.m_numMips+blit.m_dstMip
-					, blit.m_dstX
-					, blit.m_dstY
+					, dstZ*dst.m_numMips+coords.m_dstMip
+					, coords.m_dstX
+					, coords.m_dstY
 					, 0
 					, src.m_ptr
-					, srcZ*src.m_numMips+blit.m_srcMip
+					, srcZ*src.m_numMips+coords.m_srcMip
 					, depthStencil ? NULL : &box
 					);
 			}
