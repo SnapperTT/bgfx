@@ -1234,6 +1234,7 @@ namespace bgfx { namespace d3d11
 					| BGFX_CAPS_SWAP_CHAIN
 					| BGFX_CAPS_DRAW_INDIRECT
 					| BGFX_CAPS_TEXTURE_BLIT
+					| BGFX_CAPS_BUFFER_BLIT
 					| BGFX_CAPS_TEXTURE_READ_BACK
 					| ( (m_featureLevel >= D3D_FEATURE_LEVEL_9_2)
 						? BGFX_CAPS_OCCLUSION_QUERY
@@ -3851,10 +3852,14 @@ namespace bgfx { namespace d3d11
 		m_size  = _size;
 		m_flags = _flags;
 
-		const bool needUav = 0 != (_flags & (BGFX_BUFFER_COMPUTE_WRITE|BGFX_BUFFER_DRAW_INDIRECT) );
+		bool needUav = 0 != (_flags & (BGFX_BUFFER_COMPUTE_WRITE|BGFX_BUFFER_DRAW_INDIRECT) );
 		const bool needSrv = 0 != (_flags & BGFX_BUFFER_COMPUTE_READ);
 		const bool drawIndirect = 0 != (_flags & BGFX_BUFFER_DRAW_INDIRECT);
 		m_dynamic = NULL == _data && !needUav;
+		
+		// for buffer blit targets that are not dynamic buffers
+		if (!m_dynamic)
+			needUav = needUav || (0 != (_flags & BGFX_BUFFER_BLIT_DST));
 
 		D3D11_BUFFER_DESC desc;
 		desc.ByteWidth = _size;
@@ -5640,10 +5645,106 @@ namespace bgfx { namespace d3d11
 			const TextureBlitData& coords = blit.un.textureBd;
 			
 			if (!blit.isTextureBlit)
+			{
+				const BufferBlitData& copyInfo = blit.un.bufferBd;
+				
+				if (!(blit.m_src.isBuffer() && blit.m_src.isBuffer()))
 				{
-					BX_WARN(false, "Buffer blit not supported by this backend");
+					BX_WARN(false, "buffer blit requires both src and dst be buffers (not texutres or other handle types)");
 					continue;
 				}
+				
+				ID3D11Buffer* srcBuff = NULL;
+				ID3D11Buffer* dstBuff = NULL;
+				uint32_t maxSizeSrc = UINT32_MAX;
+				uint32_t maxSizeDst = UINT32_MAX;
+				
+				switch (blit.m_src.getType())
+					{
+					case Handle::DynamicIndexBuffer:
+					case Handle::IndexBuffer:
+						srcBuff = m_indexBuffers[blit.m_src.idx].m_ptr;
+						maxSizeSrc = m_indexBuffers[blit.m_src.idx].m_size;
+						break;
+					case Handle::DynamicVertexBuffer:
+					case Handle::IndirectBuffer:
+					case Handle::VertexBuffer:
+						srcBuff = m_vertexBuffers[blit.m_src.idx].m_ptr;
+						maxSizeSrc = m_vertexBuffers[blit.m_src.idx].m_size;
+						break;
+					default:
+						// should never reach here as we're already checking src.isBuffer()
+						BX_WARN(false, "unsupported handle type");
+					}
+					
+				switch (blit.m_dst.getType())
+					{
+					case Handle::DynamicIndexBuffer:
+					case Handle::IndexBuffer:
+						dstBuff = m_indexBuffers[blit.m_dst.idx].m_ptr;
+						maxSizeDst = m_indexBuffers[blit.m_dst.idx].m_size;
+						break;
+					case Handle::DynamicVertexBuffer:
+					case Handle::IndirectBuffer:
+					case Handle::VertexBuffer:
+						dstBuff = m_vertexBuffers[blit.m_dst.idx].m_ptr;
+						maxSizeDst = m_vertexBuffers[blit.m_dst.idx].m_size;
+						break;
+					default:
+						// should never reach here as we're already checking src.isBuffer()
+						BX_WARN(false, "unsupported handle type");
+					}
+				
+				if (srcBuff && dstBuff)
+				{
+					uint32_t maxWriteSize = maxSizeDst - copyInfo.m_dstOffset;
+					uint32_t maxReadSize = maxSizeSrc - copyInfo.m_srcOffset;
+					uint32_t size = bx::min(bx::min(copyInfo.m_count, maxWriteSize), maxReadSize);
+					
+					D3D11_BOX box;
+					box.left   = copyInfo.m_srcOffset;
+					box.top    = 0;
+					box.front  = 0;
+					box.right  = copyInfo.m_srcOffset + size;
+					box.bottom = 1;
+					box.back   = 1;
+									
+					deviceCtx->CopySubresourceRegion(dstBuff
+						, 0
+						, copyInfo.m_dstOffset
+						, 0
+						, 0
+						, srcBuff
+						, 0
+						, &box
+						);
+						
+					bx::printf("PRINTF dx11cmdCopyBuffer %i -> %i, sz %i\n", srcBuff, dstBuff, size);
+
+// debug errors	
+if (m_infoQueue) {
+    m_infoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_ERROR, TRUE);
+    m_infoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_CORRUPTION, TRUE);
+    
+UINT64 numMsgs = m_infoQueue->GetNumStoredMessages();
+for (UINT64 i = 0; i < numMsgs; ++i)
+{
+    SIZE_T msgLength = 0;
+    m_infoQueue->GetMessage(i, nullptr, &msgLength); // Get required size
+	
+	if (!msgLength) continue;
+
+    char buffer[msgLength + 1];
+    D3D11_MESSAGE* msg = reinterpret_cast<D3D11_MESSAGE*>(&buffer[0]);
+
+    m_infoQueue->GetMessage(i, msg, &msgLength);
+	bx::printf("PRINTF D3D11 Debug %s\n", msg->pDescription);
+}
+}
+
+				}
+				continue;
+			}
 			
 			const TextureD3D11& src = m_textures[blit.m_src.idx];
 			const TextureD3D11& dst = m_textures[blit.m_dst.idx];

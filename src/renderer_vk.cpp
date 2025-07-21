@@ -1714,6 +1714,7 @@ VK_IMPORT_INSTANCE
 					| BGFX_CAPS_TEXTURE_2D_ARRAY
 					| BGFX_CAPS_TEXTURE_3D
 					| BGFX_CAPS_TEXTURE_BLIT
+					| BGFX_CAPS_BUFFER_BLIT
 					| BGFX_CAPS_TEXTURE_COMPARE_ALL
 					| (m_deviceFeatures.imageCubeArray ? BGFX_CAPS_TEXTURE_CUBE_ARRAY : 0)
 					| BGFX_CAPS_TEXTURE_READ_BACK
@@ -8879,7 +8880,13 @@ retry:
 			uint16_t item = bs0.m_item;
 
 			const BlitItem& blit = bs0.advance();
-
+			if (!blit.isTextureBlit)
+			{
+				srcLayouts[item] = VK_IMAGE_LAYOUT_UNDEFINED;
+				dstLayouts[item] = VK_IMAGE_LAYOUT_UNDEFINED;
+				continue;
+			}
+			
 			TextureVK& src = m_textures[blit.m_src.idx];
 			TextureVK& dst = m_textures[blit.m_dst.idx];
 
@@ -8895,10 +8902,87 @@ retry:
 			const TextureBlitData& coords = blit.un.textureBd;
 
 			if (!blit.isTextureBlit)
+			{
+				const BufferBlitData& copyInfo = blit.un.bufferBd;
+				
+				if (!(blit.m_src.isBuffer() && blit.m_src.isBuffer()))
 				{
-					BX_WARN(false, "Buffer blit not supported by this backend");
+					BX_WARN(false, "buffer blit requires both src and dst be buffers (not texutres or other handle types)");
 					continue;
 				}
+				
+				VkBuffer srcBuff = VK_NULL_HANDLE;
+				VkBuffer dstBuff = VK_NULL_HANDLE;
+				uint32_t maxSizeSrc = UINT32_MAX;
+				uint32_t maxSizeDst = UINT32_MAX;
+				
+				switch (blit.m_src.getType())
+					{
+					case Handle::DynamicIndexBuffer:
+					case Handle::IndexBuffer:
+						srcBuff = m_indexBuffers[blit.m_src.idx].m_buffer;
+						maxSizeSrc = m_indexBuffers[blit.m_src.idx].m_size;
+						break;
+					case Handle::DynamicVertexBuffer:
+					case Handle::IndirectBuffer:
+					case Handle::VertexBuffer:
+						srcBuff = m_vertexBuffers[blit.m_src.idx].m_buffer;
+						maxSizeSrc = m_vertexBuffers[blit.m_src.idx].m_size;
+						break;
+					default:
+						// should never reach here as we're already checking src.isBuffer()
+						BX_WARN(false, "unsupported handle type");
+					}
+					
+				switch (blit.m_dst.getType())
+					{
+					case Handle::DynamicIndexBuffer:
+					case Handle::IndexBuffer:
+						dstBuff = m_indexBuffers[blit.m_dst.idx].m_buffer;
+						maxSizeDst = m_indexBuffers[blit.m_dst.idx].m_size;
+						break;
+					case Handle::DynamicVertexBuffer:
+					case Handle::IndirectBuffer:
+					case Handle::VertexBuffer:
+						dstBuff = m_vertexBuffers[blit.m_dst.idx].m_buffer;
+						maxSizeDst = m_vertexBuffers[blit.m_dst.idx].m_size;
+						break;
+					default:
+						// should never reach here as we're already checking src.isBuffer()
+						BX_WARN(false, "unsupported handle type");
+					}
+				
+				if (srcBuff != VK_NULL_HANDLE && dstBuff != VK_NULL_HANDLE)
+				{
+					uint32_t maxWriteSize = maxSizeDst - copyInfo.m_dstOffset;
+					uint32_t maxReadSize = maxSizeSrc - copyInfo.m_srcOffset;
+					uint32_t size = bx::min(bx::min(copyInfo.m_count, maxWriteSize), maxReadSize);
+					
+					VkBufferCopy copyRegion;
+					copyRegion.srcOffset = copyInfo.m_srcOffset;
+					copyRegion.dstOffset = copyInfo.m_srcOffset;
+					copyRegion.size      = size;
+
+					// note - Batch copy is possible with multiple copyRegions
+					// todo: itterate over blits, if src & dst are the same for adjacent blits then batch them
+					vkCmdCopyBuffer(
+						m_commandBuffer,
+						srcBuff,     // VkBuffer with VK_BUFFER_USAGE_TRANSFER_SRC_BIT
+						dstBuff,     // VkBuffer with VK_BUFFER_USAGE_TRANSFER_DST_BIT
+						1,
+						&copyRegion
+					);
+
+					setMemoryBarrier(
+						  m_commandBuffer
+						, VK_PIPELINE_STAGE_TRANSFER_BIT
+						, VK_PIPELINE_STAGE_TRANSFER_BIT
+						);
+						
+					bx::printf("PRINTF vkCmdCopyBuffer %i -> %i", srcBuff, dstBuff);
+				}
+				continue;
+			}
 
 			TextureVK& src = m_textures[blit.m_src.idx];
 			TextureVK& dst = m_textures[blit.m_dst.idx];

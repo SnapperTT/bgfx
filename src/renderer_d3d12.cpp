@@ -1621,6 +1621,7 @@ namespace bgfx { namespace d3d12
 					| BGFX_CAPS_TEXTURE_2D_ARRAY
 					| BGFX_CAPS_TEXTURE_3D
 					| BGFX_CAPS_TEXTURE_BLIT
+					| BGFX_CAPS_BUFFER_BLIT
 					| BGFX_CAPS_TEXTURE_COMPARE_ALL
 					| BGFX_CAPS_TEXTURE_CUBE_ARRAY
 					| (m_directAccessSupport ? BGFX_CAPS_TEXTURE_DIRECT_ACCESS : 0)
@@ -6602,11 +6603,76 @@ namespace bgfx { namespace d3d12
 			const BlitItem& blit = _bs.advance();
 			const TextureBlitData& coords = blit.un.textureBd;
 
+
 			if (!blit.isTextureBlit)
+			{
+				const BufferBlitData& copyInfo = blit.un.bufferBd;
+				
+				if (!(blit.m_src.isBuffer() && blit.m_src.isBuffer()))
 				{
-					BX_WARN(false, "Buffer blit not supported by this backend");
+					BX_WARN(false, "buffer blit requires both src and dst be buffers (not texutres or other handle types)");
 					continue;
 				}
+				
+				ID3D12Resource* srcBuff = NULL;
+				ID3D12Resource* dstBuff = NULL;
+				uint32_t maxSizeSrc = UINT32_MAX;
+				uint32_t maxSizeDst = UINT32_MAX;
+				
+				switch (blit.m_src.getType())
+					{
+					case Handle::DynamicIndexBuffer:
+					case Handle::IndexBuffer:
+						srcBuff = m_indexBuffers[blit.m_src.idx].m_ptr;
+						maxSizeSrc = m_indexBuffers[blit.m_src.idx].m_size;
+						break;
+					case Handle::DynamicVertexBuffer:
+					case Handle::IndirectBuffer:
+					case Handle::VertexBuffer:
+						srcBuff = m_vertexBuffers[blit.m_src.idx].m_ptr;
+						maxSizeSrc = m_vertexBuffers[blit.m_src.idx].m_size;
+						break;
+					default:
+						// should never reach here as we're already checking src.isBuffer()
+						BX_WARN(false, "unsupported handle type");
+					}
+					
+				switch (blit.m_dst.getType())
+					{
+					case Handle::DynamicIndexBuffer:
+					case Handle::IndexBuffer:
+						dstBuff = m_indexBuffers[blit.m_dst.idx].m_ptr;
+						maxSizeDst = m_indexBuffers[blit.m_dst.idx].m_size;
+						break;
+					case Handle::DynamicVertexBuffer:
+					case Handle::IndirectBuffer:
+					case Handle::VertexBuffer:
+						dstBuff = m_vertexBuffers[blit.m_dst.idx].m_ptr;
+						maxSizeDst = m_vertexBuffers[blit.m_dst.idx].m_size;
+						break;
+					default:
+						// should never reach here as we're already checking src.isBuffer()
+						BX_WARN(false, "unsupported handle type");
+					}
+				
+				if (srcBuff && dstBuff)
+				{
+					uint32_t maxWriteSize = maxSizeDst - copyInfo.m_dstOffset;
+					uint32_t maxReadSize = maxSizeSrc - copyInfo.m_srcOffset;
+					uint32_t size = bx::min(bx::min(copyInfo.m_count, maxWriteSize), maxReadSize);
+					
+					m_commandList->CopyBufferRegion(
+						  dstBuff
+						, copyInfo.m_dstOffset
+						, srcBuff
+						, copyInfo.m_srcOffset
+						, size
+						);
+						
+					bx::printf("PRINTF dx12cmdCopyBuffer %i -> %i\n", srcBuff, dstBuff);
+				}
+				continue;
+			}
 				
 			      TextureD3D12& src = m_textures[blit.m_src.idx];
 			const TextureD3D12& dst = m_textures[blit.m_dst.idx];

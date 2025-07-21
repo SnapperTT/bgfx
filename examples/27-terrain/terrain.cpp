@@ -231,6 +231,10 @@ ExampleTerrain(const char* _name, const char* _description, const char* _url)
 	void updateTerrain()
 	{
 		const bgfx::Memory* mem;
+		
+		// For dx11 backend vbos we need buffers to be marked as either BGFX_BUFFER_COMPUTE_WRITE or BGFX_BUFFER_COMPUTE_READ for buffer blit to work
+		const uint64_t flags_static_buffer = BGFX_BUFFER_BLIT_DST;//BGFX_BUFFER_COMPUTE_WRITE;
+		const uint64_t flags_dynamic_buffer = BGFX_BUFFER_BLIT_DST;//BGFX_BUFFER_COMPUTE_READ;
 
 		switch (m_terrain.m_mode)
 		{
@@ -243,14 +247,14 @@ ExampleTerrain(const char* _name, const char* _description, const char* _url)
 			}
 
 			mem = bgfx::makeRef(&m_terrain.m_vertices[0], sizeof(PosTexCoord0Vertex) * m_terrain.m_vertexCount);
-			m_vbh = bgfx::createVertexBuffer(mem, PosTexCoord0Vertex::ms_layout);
+			m_vbh = bgfx::createVertexBuffer(mem, PosTexCoord0Vertex::ms_layout, flags_static_buffer);
 			if (bgfx::isValid(m_ibh) )
 			{
 				bgfx::destroy(m_ibh);
 			}
 
 			mem = bgfx::makeRef(&m_terrain.m_indices[0], sizeof(uint16_t) * m_terrain.m_indexCount);
-			m_ibh = bgfx::createIndexBuffer(mem);
+			m_ibh = bgfx::createIndexBuffer(mem, flags_static_buffer);
 			break;
 
 		case 1: // Dynamic Vertex Buffer : Utilize dynamic vertex buffer to update terrain.
@@ -259,7 +263,7 @@ ExampleTerrain(const char* _name, const char* _description, const char* _url)
 
 			if (!bgfx::isValid(m_dvbh) )
 			{
-				m_dvbh = bgfx::createDynamicVertexBuffer(m_terrain.m_vertexCount, PosTexCoord0Vertex::ms_layout);
+				m_dvbh = bgfx::createDynamicVertexBuffer(m_terrain.m_vertexCount, PosTexCoord0Vertex::ms_layout, flags_dynamic_buffer);
 			}
 
 			mem = bgfx::makeRef(&m_terrain.m_vertices[0], sizeof(PosTexCoord0Vertex) * m_terrain.m_vertexCount);
@@ -267,7 +271,7 @@ ExampleTerrain(const char* _name, const char* _description, const char* _url)
 
 			if (!bgfx::isValid(m_dibh) )
 			{
-				m_dibh = bgfx::createDynamicIndexBuffer(m_terrain.m_indexCount);
+				m_dibh = bgfx::createDynamicIndexBuffer(m_terrain.m_indexCount, flags_dynamic_buffer);
 			}
 
 			mem = bgfx::makeRef(&m_terrain.m_indices[0], sizeof(uint16_t) * m_terrain.m_indexCount);
@@ -278,10 +282,10 @@ ExampleTerrain(const char* _name, const char* _description, const char* _url)
 				if (!bgfx::isValid(m_vbh) || !bgfx::isValid(m_ibh) )
 				{
 					mem = bgfx::makeRef(NULL, sizeof(PosTexCoord0Vertex) * m_terrain.m_vertexCount);
-					m_vbh = bgfx::createVertexBuffer(mem, PosTexCoord0Vertex::ms_layout);
+					m_vbh = bgfx::createVertexBuffer(mem, PosTexCoord0Vertex::ms_layout, flags_static_buffer);
 
 					mem = bgfx::makeRef(NULL, sizeof(uint16_t) * m_terrain.m_indexCount);
-					m_ibh = bgfx::createIndexBuffer(mem);
+					m_ibh = bgfx::createIndexBuffer(mem, flags_static_buffer);
 				}
 			}
 			
@@ -292,10 +296,10 @@ ExampleTerrain(const char* _name, const char* _description, const char* _url)
 				updateTerrainMesh();
 
 				mem = bgfx::makeRef(&m_terrain.m_vertices[0], sizeof(PosTexCoord0Vertex) * m_terrain.m_vertexCount);
-				m_vbh = bgfx::createVertexBuffer(mem, PosTexCoord0Vertex::ms_layout);
+				m_vbh = bgfx::createVertexBuffer(mem, PosTexCoord0Vertex::ms_layout, flags_static_buffer);
 
 				mem = bgfx::makeRef(&m_terrain.m_indices[0], sizeof(uint16_t) * m_terrain.m_indexCount);
-				m_ibh = bgfx::createIndexBuffer(mem);
+				m_ibh = bgfx::createIndexBuffer(mem, flags_static_buffer);
 			}
 
 			if (!bgfx::isValid(m_heightTexture) )
@@ -456,7 +460,7 @@ ExampleTerrain(const char* _name, const char* _description, const char* _url)
 			}
 
 			// Update terrain.
-			bool terrainUpdated = false;
+			bool terrainUpdated = true; // try to copy every frame
 			if (m_terrain.m_dirty)
 			{
 				updateTerrain();

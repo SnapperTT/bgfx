@@ -3338,7 +3338,6 @@ namespace bgfx { namespace gl
 
 		void createVertexBuffer(VertexBufferHandle _handle, const Memory* _mem, VertexLayoutHandle _layoutHandle, uint16_t _flags) override
 		{
-			bx::printf("PRINTF createVertexBuffer%i %i\n", _handle.idx, _mem->size);
 			m_vertexBuffers[_handle.idx].create(_mem->size, _mem->data, _layoutHandle, _flags);
 		}
 
@@ -3366,13 +3365,11 @@ namespace bgfx { namespace gl
 		{
 			VertexLayoutHandle layoutHandle = BGFX_INVALID_HANDLE;
 			m_vertexBuffers[_handle.idx].create(_size, NULL, layoutHandle, _flags);
-			bx::printf("PRINTF createDynamicVertexBuffer%i %i, internalSize: %i\n", _handle.idx, _size, m_vertexBuffers[_handle.idx].m_size);
 		}
 
 		void updateDynamicVertexBuffer(VertexBufferHandle _handle, uint32_t _offset, uint32_t _size, const Memory* _mem) override
 		{
 			m_vertexBuffers[_handle.idx].update(_offset, bx::uint32_min(_size, _mem->size), _mem->data);
-			bx::printf("PRINTF updateDynamicVertexBuffer%i sz: %i %i, offset: %i, stored size: %i\n", _handle.idx, _size, _mem->size, _offset, m_vertexBuffers[_handle.idx].m_size);
 		}
 
 		void destroyDynamicVertexBuffer(VertexBufferHandle _handle) override
@@ -7428,7 +7425,8 @@ namespace bgfx { namespace gl
 						BX_WARN(false, "buffer blit not supported!");
 						continue;
 					}
-					if (!(bi.m_src.isBuffer() && bi.m_src.isBuffer())) {
+					if (!(bi.m_src.isBuffer() && bi.m_src.isBuffer()))
+					{
 						BX_WARN(false, "buffer blit requires both src and dst be buffers (not texutres or other handle types)");
 						continue;
 					}

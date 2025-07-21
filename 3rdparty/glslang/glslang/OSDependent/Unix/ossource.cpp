@@ -40,7 +40,9 @@
 #include <cstdio>
 
 #if !defined(__Fuchsia__)
-#include <sys/resource.h>
+	#ifndef __WIN32
+		#include <sys/resource.h>
+	#endif
 #endif
 
 namespace glslang {
@@ -49,6 +51,7 @@ namespace glslang {
 
 void OS_DumpMemoryCounters()
 {
+	#ifndef __WIN32
 #ifdef DUMP_COUNTERS
     struct rusage usage;
 
@@ -57,6 +60,7 @@ void OS_DumpMemoryCounters()
 #else
     printf("Recompile with DUMP_COUNTERS defined to see counters.\n");
 #endif
+	#endif
 }
 
 } // end namespace glslang
