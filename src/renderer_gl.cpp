@@ -1163,6 +1163,10 @@ namespace bgfx { namespace gl
 	{
 	}
 
+	static void GL_APIENTRY stubCopyBufferSubData(GLenum /*_readTarget*/, GLenum /*_writeTarget*/, GLintptr /*_readOffset*/, GLintptr /*_writeOffset*/, GLsizeiptr /*_size*/)
+	{
+	}
+
 	typedef void (*PostSwapBuffersFn)(uint32_t _width, uint32_t _height);
 
 	void flushGlError()
@@ -2898,11 +2902,16 @@ namespace bgfx { namespace gl
 					: 0
 					;
 
-				#if BGFX_CONFIG_RENDERER_OPENGL || !(BGFX_CONFIG_RENDERER_OPENGLES < 30)
-					m_bufferBlitSupported = NULL != glCopyBufferSubData;
-				#endif
+				if (NULL == glCopyBufferSubData)
+				{
+					glCopyBufferSubData = stubCopyBufferSubData;
+				}
+				else
+				{
+					m_bufferBlitSupported = true;
+				}
 				
-				g_caps.supported |= m_bufferBlitSupported ? BGFX_CAPS_BUFFER_BLIT : 0;
+				g_caps.supported |= (m_bufferBlitSupported ? BGFX_CAPS_BUFFER_BLIT : 0);
 
 				g_caps.supported |= (m_readBackSupported || BX_ENABLED(BGFX_GL_CONFIG_TEXTURE_READ_BACK_EMULATION) )
 					? BGFX_CAPS_TEXTURE_READ_BACK
@@ -7427,8 +7436,7 @@ namespace bgfx { namespace gl
 						BX_WARN(false, "buffer blit not supported!");
 						continue;
 					}
-					
-					#if BGFX_CONFIG_RENDERER_OPENGL || !(BGFX_CONFIG_RENDERER_OPENGLES < 30)
+		
 					GLuint srcBuffGl = 0;
 					GLuint dstBuffGl = 0;
 					uint32_t maxSizeSrc = UINT32_MAX;
@@ -7481,7 +7489,6 @@ namespace bgfx { namespace gl
 						
 						GL_CHECK( glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, copyInfo.m_srcOffset, copyInfo.m_dstOffset, size) );
 					}
-					#endif // BGFX_CONFIG_RENDERER_OPENGL || !(BGFX_CONFIG_RENDERER_OPENGLES < 30)
 					continue;
 				}
 				
