@@ -2898,7 +2898,9 @@ namespace bgfx { namespace gl
 					: 0
 					;
 
-				m_bufferBlitSupported = NULL != glCopyBufferSubData;
+				#if BGFX_CONFIG_RENDERER_OPENGL || !(BGFX_CONFIG_RENDERER_OPENGLES < 30)
+					m_bufferBlitSupported = NULL != glCopyBufferSubData;
+				#endif
 				
 				g_caps.supported |= m_bufferBlitSupported ? BGFX_CAPS_BUFFER_BLIT : 0;
 
@@ -7425,7 +7427,8 @@ namespace bgfx { namespace gl
 						BX_WARN(false, "buffer blit not supported!");
 						continue;
 					}
-		
+					
+					#if BGFX_CONFIG_RENDERER_OPENGL || !(BGFX_CONFIG_RENDERER_OPENGLES < 30)
 					GLuint srcBuffGl = 0;
 					GLuint dstBuffGl = 0;
 					uint32_t maxSizeSrc = UINT32_MAX;
@@ -7478,6 +7481,7 @@ namespace bgfx { namespace gl
 						
 						GL_CHECK( glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, copyInfo.m_srcOffset, copyInfo.m_dstOffset, size) );
 					}
+					#endif // BGFX_CONFIG_RENDERER_OPENGL || !(BGFX_CONFIG_RENDERER_OPENGLES < 30)
 					continue;
 				}
 				
