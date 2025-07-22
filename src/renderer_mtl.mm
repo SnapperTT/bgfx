@@ -4086,10 +4086,69 @@ BX_PRAGMA_DIAGNOSTIC_POP();
 			const TextureBlitData& coords = bi.un.textureBd;
 
 			if (!bi.isTextureBlit)
+			{
+				const BufferBlitData& copyInfo = blit.un.bufferBd;
+				
+				Buffer srcBuff = NULL;
+				Buffer dstBuff = NULL;
+				uint32_t maxSizeSrc = UINT32_MAX;
+				uint32_t maxSizeDst = UINT32_MAX;
+				
+				switch (blit.m_src.getType())
+					{
+					case Handle::DynamicIndexBuffer:
+					case Handle::IndexBuffer:
+						srcBuff = m_indexBuffers[blit.m_src.idx].m_ptr;
+						maxSizeSrc = m_indexBuffers[blit.m_src.idx].m_size;
+						break;
+					case Handle::DynamicVertexBuffer:
+					case Handle::IndirectBuffer:
+					case Handle::VertexBuffer:
+						srcBuff = m_vertexBuffers[blit.m_src.idx].m_ptr;
+						maxSizeSrc = m_vertexBuffers[blit.m_src.idx].m_size;
+						break;
+					default:
+						// should never reach here as we're already checking src.isBuffer()
+						BX_WARN(false, "unsupported handle type");
+					}
+					
+				switch (blit.m_dst.getType())
+					{
+					case Handle::DynamicIndexBuffer:
+					case Handle::IndexBuffer:
+						dstBuff = m_indexBuffers[blit.m_dst.idx].m_ptr;
+						maxSizeDst = m_indexBuffers[blit.m_dst.idx].m_size;
+						break;
+					case Handle::DynamicVertexBuffer:
+					case Handle::IndirectBuffer:
+					case Handle::VertexBuffer:
+						dstBuff = m_vertexBuffers[blit.m_dst.idx].m_ptr;
+						maxSizeDst = m_vertexBuffers[blit.m_dst.idx].m_size;
+						break;
+					default:
+						// should never reach here as we're already checking src.isBuffer()
+						BX_WARN(false, "unsupported handle type");
+					}
+				
+				if (srcBuff && dstBuff)
 				{
-					BX_WARN(false, "Buffer blit not supported by this backend");
-					continue;
-				}
+					uint32_t maxWriteSize = maxSizeDst - copyInfo.m_dstOffset;
+					uint32_t maxReadSize = maxSizeSrc - copyInfo.m_srcOffset;
+					uint32_t size = bx::min(bx::min(copyInfo.m_count, maxWriteSize), maxReadSize);
+					
+					// This should always be true as we've tested m_dstOffset/m_srcOffset/m_count in bgfx.cpp::blit()
+					BX_ASSERT(size % 4 == 0, "copy size must be multiple of 4");
+					
+					m_blitCommandEncoder.copyFromBuffer( 
+						srcBuff,
+						copyInfo.m_srcOffset,
+						dstBuff,
+						copyInfo.m_dstOffset,
+						size
+						);
+				}				
+				continue;
+			}
 
 			const TextureMtl& src = m_textures[blit.m_src.idx];
 			const TextureMtl& dst = m_textures[blit.m_dst.idx];

@@ -6608,12 +6608,6 @@ namespace bgfx { namespace d3d12
 			{
 				const BufferBlitData& copyInfo = blit.un.bufferBd;
 				
-				if (!(blit.m_src.isBuffer() && blit.m_src.isBuffer()))
-				{
-					BX_WARN(false, "buffer blit requires both src and dst be buffers (not texutres or other handle types)");
-					continue;
-				}
-				
 				ID3D12Resource* srcBuff = NULL;
 				ID3D12Resource* dstBuff = NULL;
 				uint32_t maxSizeSrc = UINT32_MAX;
@@ -6668,8 +6662,6 @@ namespace bgfx { namespace d3d12
 						, copyInfo.m_srcOffset
 						, size
 						);
-						
-					bx::printf("PRINTF dx12cmdCopyBuffer %i -> %i\n", srcBuff, dstBuff);
 				}
 				continue;
 			}

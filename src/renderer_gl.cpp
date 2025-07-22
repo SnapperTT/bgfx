@@ -7425,11 +7425,6 @@ namespace bgfx { namespace gl
 						BX_WARN(false, "buffer blit not supported!");
 						continue;
 					}
-					if (!(bi.m_src.isBuffer() && bi.m_src.isBuffer()))
-					{
-						BX_WARN(false, "buffer blit requires both src and dst be buffers (not texutres or other handle types)");
-						continue;
-					}
 		
 					GLuint srcBuffGl = 0;
 					GLuint dstBuffGl = 0;
@@ -7480,8 +7475,7 @@ namespace bgfx { namespace gl
 						uint32_t maxWriteSize = maxSizeDst - copyInfo.m_dstOffset;
 						uint32_t maxReadSize = maxSizeSrc - copyInfo.m_srcOffset;
 						uint32_t size = bx::min(bx::min(copyInfo.m_count, maxWriteSize), maxReadSize);
-						bx::printf("PRINTF blit, bgfx id %i -> %i (glId %i -> %i)\n", bi.m_src.idx, bi.m_dst.idx, srcBuffGl, dstBuffGl);
-						bx::printf("PRINTF max sizes %i -> %i, rq: %i, final: %i\n", maxSizeSrc, maxSizeDst, copyInfo.m_count, size);
+						
 						GL_CHECK( glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, copyInfo.m_srcOffset, copyInfo.m_dstOffset, size) );
 					}
 					continue;

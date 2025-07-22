@@ -495,13 +495,6 @@ ExampleTerrain(const char* _name, const char* _description, const char* _url)
 				// Copy from DynamicVertexBuffer/DynamicIndexBuffer to static buffers
 				if (terrainUpdated && bgfx::getCaps()->supported & BGFX_CAPS_BUFFER_BLIT)
 				{
-					BX_ASSERT(bgfx::isValid(m_vbh), "m_vbh is invalid");
-					BX_ASSERT(bgfx::isValid(m_ibh), "m_ibh is invalid");
-					BX_ASSERT(bgfx::isValid(m_dvbh), "m_dvbh is invalid");
-					BX_ASSERT(bgfx::isValid(m_dibh), "m_dibh is invalid");
-					
-					bx::printf("PRINTF Ask for blit: m_vbh %i, m_dvbh %i!\n", m_vbh.idx, m_dvbh.idx);
-			
 					bgfx::blit(0, bgfx::Handle(m_vbh), 0, bgfx::Handle(m_dvbh), 0, sizeof(PosTexCoord0Vertex) * m_terrain.m_vertexCount);
 					bgfx::blit(0, bgfx::Handle(m_ibh), 0, bgfx::Handle(m_dibh), 0, sizeof(uint16_t) * m_terrain.m_indexCount);
 				}
@@ -523,7 +516,6 @@ ExampleTerrain(const char* _name, const char* _description, const char* _url)
 			// Advance to next frame. Rendering thread will be kicked to
 			// process submitted rendering primitives.
 			bgfx::frame();
-			bx::printf("PRINTF FRAME!\n");
 
 			return true;
 		}

@@ -1934,8 +1934,10 @@ namespace bgfx
 		/// @param[in] _srcOffsetInBytes Read index in the source buffer in bytes
 		/// @param[in] _count Number of bytes to copy. Pass UINT32_MAX to copy to end of buffer
 		///
+		/// Destination buffers must be created with `BGFX_BUFFER_BLIT_DST`
+		/// You cannot blit between a vertex buffer and a index buffer, or between buffers and textures
+		///
 		/// @attention Availability depends on: `BGFX_CAPS_BUFFER_BLIT`.
-		/// @attention Blitting to or from Texture to Buffer depends on: `BGFX_CAPS_TEXTURE_BUFFER_BLIT`.
 		///
 		void blit(
 			  ViewId _id
@@ -4539,8 +4541,10 @@ namespace bgfx
 	/// @param[in] _srcOffsetInBytes Read index in the source buffer in bytes
 	/// @param[in] _count Number of bytes to copy. Pass UINT32_MAX to copy to end of buffer
 	///
+	/// Destination buffers must be created with `BGFX_BUFFER_BLIT_DST`
+	/// You cannot blit between a vertex buffer and a index buffer, or between buffers and textures
+	///
 	/// @attention Availability depends on: `BGFX_CAPS_BUFFER_BLIT`.
-	/// @attention Blitting to or from Texture to Buffer depends on: `BGFX_CAPS_TEXTURE_BUFFER_BLIT`.
 	///
 	void blit(
 		  ViewId _id

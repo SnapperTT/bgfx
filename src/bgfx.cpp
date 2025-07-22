@@ -4253,8 +4253,37 @@ namespace bgfx
 	
 	void Encoder::blit(ViewId _id, Handle _dst, uint32_t _dstOffsetInBytes, Handle _src, uint32_t _srcOffsetInBytes, uint32_t _count)
 	{
-		#warning This is ugly and probably not the correct place to do this
-		// get the underlying vertex/index buffers
+		BGFX_CHECK_CAPS(BGFX_CAPS_BUFFER_BLIT, "Buffer blit is not supported!");
+		
+		// Flags to detect if we're copying between compatable resources
+		const bool srcIsVb = (_src.getType() == Handle::Enum::DynamicVertexBuffer || _src.getType() == Handle::Enum::VertexBuffer || _src.getType() == Handle::Enum::IndirectBuffer);
+		const bool srcIsIb = (_src.getType() == Handle::Enum::DynamicIndexBuffer  || _src.getType() == Handle::Enum::IndexBuffer);
+		const bool srcIsTexture = _src.isTexture();
+		const bool dstIsVb = (_dst.getType() == Handle::Enum::DynamicVertexBuffer || _dst.getType() == Handle::Enum::VertexBuffer || _dst.getType() == Handle::Enum::IndirectBuffer);
+		const bool dstIsIb = (_dst.getType() == Handle::Enum::DynamicIndexBuffer  || _dst.getType() == Handle::Enum::IndexBuffer);
+		const bool dstIsTexture = _dst.isTexture();
+		
+		// Dx11 does not permit this
+		// TBD - emulate with compute shader
+		BX_ASSERT ( !((srcIsIb && dstIsVb) || (srcIsVb && dstIsIb) ),
+			"Cannot blit between vertex and index buffers");
+		
+		// This is probably do-able but needs a lot of checking
+		BX_ASSERT ( !(srcIsTexture && dstIsTexture),
+			"Use the texture blit functions to blit betwen textures");
+		
+		// TBD - Blit Buffer <-> Texture
+		// What platforms support this? Where can this be emulated with compute?
+		BX_ASSERT ( !( (srcIsIb && dstIsTexture) || (srcIsVb && dstIsTexture) ||
+					   (srcIsTexture && dstIsIb) || (srcIsTexture && srcIsIb) ),
+			"Cannot blit between buffers and textures");
+	
+		// Metal requires offsets and sizes to be multiples of 4
+		BX_ASSERT ( _dstOffsetInBytes % 4 == 0, "Destination offset must be a multiple of 4");
+		BX_ASSERT ( _srcOffsetInBytes % 4 == 0, "Source offset must be a multiple of 4");
+		BX_ASSERT ( (_count % 4 == 0) || (_count == UINT32_MAX), "Size must be a multiple of 4 or UINT32_MAX");
+		
+		// For dynamic buffers, get the underlying vertex/index buffers handles
 		if (_src.getType() == Handle::Enum::DynamicVertexBuffer) {
 			DynamicVertexBuffer& dvb = s_ctx->m_dynamicVertexBuffers[_src.idx];
 			_src.idx = dvb.m_handle.idx;

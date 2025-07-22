@@ -5648,12 +5648,6 @@ namespace bgfx { namespace d3d11
 			{
 				const BufferBlitData& copyInfo = blit.un.bufferBd;
 				
-				if (!(blit.m_src.isBuffer() && blit.m_src.isBuffer()))
-				{
-					BX_WARN(false, "buffer blit requires both src and dst be buffers (not texutres or other handle types)");
-					continue;
-				}
-				
 				ID3D11Buffer* srcBuff = NULL;
 				ID3D11Buffer* dstBuff = NULL;
 				uint32_t maxSizeSrc = UINT32_MAX;
@@ -5718,30 +5712,6 @@ namespace bgfx { namespace d3d11
 						, 0
 						, &box
 						);
-						
-					bx::printf("PRINTF dx11cmdCopyBuffer %i -> %i, sz %i\n", srcBuff, dstBuff, size);
-
-// debug errors	
-if (m_infoQueue) {
-    m_infoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_ERROR, TRUE);
-    m_infoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_CORRUPTION, TRUE);
-    
-UINT64 numMsgs = m_infoQueue->GetNumStoredMessages();
-for (UINT64 i = 0; i < numMsgs; ++i)
-{
-    SIZE_T msgLength = 0;
-    m_infoQueue->GetMessage(i, nullptr, &msgLength); // Get required size
-	
-	if (!msgLength) continue;
-
-    char buffer[msgLength + 1];
-    D3D11_MESSAGE* msg = reinterpret_cast<D3D11_MESSAGE*>(&buffer[0]);
-
-    m_infoQueue->GetMessage(i, msg, &msgLength);
-	bx::printf("PRINTF D3D11 Debug %s\n", msg->pDescription);
-}
-}
-
 				}
 				continue;
 			}

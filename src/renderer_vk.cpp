@@ -8905,12 +8905,6 @@ retry:
 			{
 				const BufferBlitData& copyInfo = blit.un.bufferBd;
 				
-				if (!(blit.m_src.isBuffer() && blit.m_src.isBuffer()))
-				{
-					BX_WARN(false, "buffer blit requires both src and dst be buffers (not texutres or other handle types)");
-					continue;
-				}
-				
 				VkBuffer srcBuff = VK_NULL_HANDLE;
 				VkBuffer dstBuff = VK_NULL_HANDLE;
 				uint32_t maxSizeSrc = UINT32_MAX;
@@ -8978,8 +8972,6 @@ retry:
 						, VK_PIPELINE_STAGE_TRANSFER_BIT
 						, VK_PIPELINE_STAGE_TRANSFER_BIT
 						);
-						
-					bx::printf("PRINTF vkCmdCopyBuffer %i -> %i", srcBuff, dstBuff);
 				}
 				continue;
 			}
