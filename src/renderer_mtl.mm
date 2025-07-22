@@ -4083,9 +4083,9 @@ BX_PRAGMA_DIAGNOSTIC_POP();
 		while (_bs.hasItem(_view) )
 		{
 			const BlitItem& blit = _bs.advance();
-			const TextureBlitData& coords = blit.un.textureBd;
+			const TextureBlitData& coords = bi.un.textureBd;
 
-			if (!blit.isTextureBlit)
+			if (!bi.isTextureBlit)
 			{
 				const BufferBlitData& copyInfo = blit.un.bufferBd;
 				
