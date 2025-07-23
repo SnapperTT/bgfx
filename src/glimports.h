@@ -274,7 +274,6 @@ GL_IMPORT______(true , PFNGLCOMPRESSEDTEXIMAGE3DPROC,              glCompressedT
 GL_IMPORT______(true , PFNGLCOMPRESSEDTEXSUBIMAGE3DPROC,           glCompressedTexSubImage3D);
 GL_IMPORT______(true , PFNGLCOPYIMAGESUBDATAPROC,                  glCopyImageSubData);
 GL_IMPORT______(true , PFNGLCOPYTEXSUBIMAGE2DPROC,                 glCopyTexSubImage2D);
-GL_IMPORT______(true , PFNGLCOPYBUFFERSUBDATAPROC,                 glCopyBufferSubData);
 GL_IMPORT______(false, PFNGLCREATEPROGRAMPROC,                     glCreateProgram);
 GL_IMPORT______(false, PFNGLCREATESHADERPROC,                      glCreateShader);
 GL_IMPORT______(false, PFNGLCULLFACEPROC,                          glCullFace);
@@ -505,6 +504,7 @@ GL_IMPORT______(true,  PFNGLGETINTERNALFORMATI64VPROC,             glGetInternal
 
 GL_IMPORT______(true,  PFNGLGETTRANSLATEDSHADERSOURCEANGLEPROC,    glGetTranslatedShaderSourceANGLE);
 GL_IMPORT______(true, PFNGLFRAMEBUFFERTEXTURE2DMULTISAMPLEIMGPROC, glFramebufferTexture2DMultisampleEXT);
+GL_IMPORT______(true , PFNGLCOPYBUFFERSUBDATAPROC,                 glCopyBufferSubData);
 
 #if !BGFX_CONFIG_RENDERER_OPENGL
 GL_IMPORT______(true,  PFNGLPOINTSIZEPROC,                         glPointSize);

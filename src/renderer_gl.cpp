@@ -2901,7 +2901,7 @@ namespace bgfx { namespace gl
 					? BGFX_CAPS_TEXTURE_BLIT
 					: 0
 					;
-
+				
 				if (NULL == glCopyBufferSubData)
 				{
 					glCopyBufferSubData = stubCopyBufferSubData;
