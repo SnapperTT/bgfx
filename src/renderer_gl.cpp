@@ -11,6 +11,28 @@
 #	include <bx/uint32_t.h>
 #	include "emscripten.h"
 
+// Dewrangle copy/write buffer arb/nb/ext definitions
+#ifndef GL_COPY_READ_BUFFER
+# ifdef GL_COPY_READ_BUFFER_ARB
+#  define GL_COPY_READ_BUFFER GL_COPY_READ_BUFFER_ARB
+# elif defined(GL_COPY_READ_BUFFER_NV)
+#  define GL_COPY_READ_BUFFER GL_COPY_READ_BUFFER_NV
+# elif defined(GL_COPY_READ_BUFFER_EXT)
+#  define GL_COPY_READ_BUFFER GL_COPY_READ_BUFFER_EXT
+# endif
+#endif
+
+#ifndef GL_COPY_WRITE_BUFFER
+# ifdef GL_COPY_WRITE_BUFFER_ARB
+#  define GL_COPY_WRITE_BUFFER GL_COPY_WRITE_BUFFER_ARB
+# elif defined(GL_COPY_WRITE_BUFFER_NV)
+#  define GL_COPY_WRITE_BUFFER GL_COPY_WRITE_BUFFER_NV
+# elif defined(GL_COPY_WRITE_BUFFER_EXT)
+#  define GL_COPY_WRITE_BUFFER GL_COPY_WRITE_BUFFER_EXT
+# endif
+#endif
+
+
 namespace bgfx { namespace gl
 {
 	static char s_viewName[BGFX_CONFIG_MAX_VIEWS][BGFX_CONFIG_MAX_VIEW_NAME];
