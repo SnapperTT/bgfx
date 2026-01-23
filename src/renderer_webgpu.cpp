@@ -1145,6 +1145,7 @@ WGPU_IMPORT
 							| BGFX_CAPS_TEXTURE_2D_ARRAY
 							| BGFX_CAPS_TEXTURE_3D
 							| BGFX_CAPS_TEXTURE_BLIT
+							| BGFX_CAPS_BUFFER_BLIT
 							| BGFX_CAPS_TEXTURE_COMPARE_ALL
 							| BGFX_CAPS_TEXTURE_COMPARE_LEQUAL
 							| BGFX_CAPS_TEXTURE_CUBE_ARRAY
@@ -5141,38 +5142,107 @@ m_resolution.formatColor = TextureFormat::BGRA8;
 		{
 			const BlitItem& blit = _bs.advance();
 
-			const TextureWGPU& src = m_textures[blit.m_src.idx];
-			const TextureWGPU& dst = m_textures[blit.m_dst.idx];
-
-			s_renderWGPU->m_cmd.copyTextureToTexture(
-				{
-					.texture  = src.m_texture,
-					.mipLevel = blit.m_srcMip,
-					.origin =
+			
+			if (!blit.isTextureBlit)
+			{
+				const BufferBlitData& copyInfo = blit.un.bufferBd;
+				
+				WGPUBuffer srcBuff = NULL;
+				WGPUBuffer dstBuff = NULL;
+				uint32_t maxSizeSrc = UINT32_MAX;
+				uint32_t maxSizeDst = UINT32_MAX;
+				
+				switch (blit.m_src.getType())
 					{
-						.x = blit.m_srcX,
-						.y = blit.m_srcY,
-						.z = blit.m_srcZ,
-					},
-					.aspect = WGPUTextureAspect_All,
-				},
-				{
-					.texture  = dst.m_texture,
-					.mipLevel = blit.m_dstMip,
-					.origin =
+					case Handle::DynamicIndexBuffer:
+					case Handle::IndexBuffer:
+						srcBuff = m_indexBuffers[blit.m_src.idx].m_buffer;
+						maxSizeSrc = m_indexBuffers[blit.m_src.idx].m_size;
+						break;
+					case Handle::DynamicVertexBuffer:
+					case Handle::IndirectBuffer:
+					case Handle::VertexBuffer:
+						srcBuff = m_vertexBuffers[blit.m_src.idx].m_buffer;
+						maxSizeSrc = m_vertexBuffers[blit.m_src.idx].m_size;
+						break;
+					default:
+						// should never reach here as we're already checking src.isBuffer()
+						BX_WARN(false, "unsupported handle type");
+					}
+					
+				switch (blit.m_dst.getType())
 					{
-						.x = blit.m_dstX,
-						.y = blit.m_dstY,
-						.z = blit.m_dstZ,
-					},
-					.aspect = WGPUTextureAspect_All,
-				},
+					case Handle::DynamicIndexBuffer:
+					case Handle::IndexBuffer:
+						dstBuff = m_indexBuffers[blit.m_dst.idx].m_buffer;
+						maxSizeDst = m_indexBuffers[blit.m_dst.idx].m_size;
+						break;
+					case Handle::DynamicVertexBuffer:
+					case Handle::IndirectBuffer:
+					case Handle::VertexBuffer:
+						dstBuff = m_vertexBuffers[blit.m_dst.idx].m_buffer;
+						maxSizeDst = m_vertexBuffers[blit.m_dst.idx].m_size;
+						break;
+					default:
+						// should never reach here as we're already checking src.isBuffer()
+						BX_WARN(false, "unsupported handle type");
+					}
+				
+				if (srcBuff && dstBuff)
 				{
-					.width              = blit.m_width,
-					.height             = blit.m_height,
-					.depthOrArrayLayers = bx::max<uint32_t>(1, blit.m_depth),
+					uint32_t maxWriteSize = maxSizeDst - copyInfo.m_dstOffset;
+					uint32_t maxReadSize = maxSizeSrc - copyInfo.m_srcOffset;
+					uint32_t size = bx::min(bx::min(copyInfo.m_count, maxWriteSize), maxReadSize);
+					
+					// This should always be true as we've tested m_dstOffset/m_srcOffset/m_count in bgfx.cpp::blit()
+					BX_ASSERT(size % 4 == 0, "copy size must be multiple of 4");
+					
+					s_renderWGPU->m_cmd.copyBufferToBuffer(
+						srcBuff,
+						copyInfo.m_srcOffset,
+						dstBuff,
+						copyInfo.m_dstOffset,
+						size
+						);
 				}
-				);
+			}
+			else
+			{
+				const TextureBlitData& coords = blit.un.textureBd;
+				
+				const TextureWGPU& src = m_textures[blit.m_src.idx];
+				const TextureWGPU& dst = m_textures[blit.m_dst.idx];
+
+				s_renderWGPU->m_cmd.copyTextureToTexture(
+					{
+						.texture  = src.m_texture,
+						.mipLevel = coords.m_srcMip,
+						.origin =
+						{
+							.x = coords.m_srcX,
+							.y = coords.m_srcY,
+							.z = coords.m_srcZ,
+						},
+						.aspect = WGPUTextureAspect_All,
+					},
+					{
+						.texture  = dst.m_texture,
+						.mipLevel = coords.m_dstMip,
+						.origin =
+						{
+							.x = coords.m_dstX,
+							.y = coords.m_dstY,
+							.z = coords.m_dstZ,
+						},
+						.aspect = WGPUTextureAspect_All,
+					},
+					{
+						.width              = coords.m_width,
+						.height             = coords.m_height,
+						.depthOrArrayLayers = bx::max<uint32_t>(1, coords.m_depth),
+					}
+					);
+			}
 		}
 	}
 
