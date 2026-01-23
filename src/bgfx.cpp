@@ -4283,25 +4283,39 @@ namespace bgfx
 		BX_ASSERT ( _srcOffsetInBytes % 4 == 0, "Source offset must be a multiple of 4");
 		BX_ASSERT ( (_count % 4 == 0) || (_count == UINT32_MAX), "Size must be a multiple of 4 or UINT32_MAX");
 		
+
 		// For dynamic buffers, get the underlying vertex/index buffers handles
+		uint32_t srcDynamicBufferOffsetBytes = 0;
+		uint32_t dstDynamicBufferOffsetBytes = 0;
+		
 		if (_src.getType() == Handle::Enum::DynamicVertexBuffer) {
 			DynamicVertexBuffer& dvb = s_ctx->m_dynamicVertexBuffers[_src.idx];
 			_src.idx = dvb.m_handle.idx;
+			
+			srcDynamicBufferOffsetBytes = (dvb.m_startVertex)*dvb.m_stride;
 			}
 		if (_dst.getType() == Handle::Enum::DynamicVertexBuffer) {
 			DynamicVertexBuffer& dvb = s_ctx->m_dynamicVertexBuffers[_dst.idx];
 			_dst.idx = dvb.m_handle.idx;
+			
+			dstDynamicBufferOffsetBytes = (dvb.m_startVertex)*dvb.m_stride;
 			}
 		if (_src.getType() == Handle::Enum::DynamicIndexBuffer) {
 			DynamicIndexBuffer& dib = s_ctx->m_dynamicIndexBuffers[_src.idx];
 			_src.idx = dib.m_handle.idx;
+			
+			const uint32_t indexSize = 0 == (dib.m_flags & BGFX_BUFFER_INDEX32) ? 2 : 4;
+			srcDynamicBufferOffsetBytes = (dib.m_startIndex)*indexSize;
 			}
 		if (_dst.getType() == Handle::Enum::DynamicIndexBuffer) {
 			DynamicIndexBuffer& dib = s_ctx->m_dynamicIndexBuffers[_dst.idx];
 			_dst.idx = dib.m_handle.idx;
+			
+			const uint32_t indexSize = 0 == (dib.m_flags & BGFX_BUFFER_INDEX32) ? 2 : 4;
+			dstDynamicBufferOffsetBytes = (dib.m_startIndex)*indexSize;
 			}
 		
-		BGFX_ENCODER(blit(_id, _dst, _dstOffsetInBytes, _src, _srcOffsetInBytes, _count) );
+		BGFX_ENCODER(blit(_id, _dst, _dstOffsetInBytes + dstDynamicBufferOffsetBytes, _src, _srcOffsetInBytes + srcDynamicBufferOffsetBytes, _count) );
 	}
 
 #undef BGFX_ENCODER
