@@ -9062,11 +9062,14 @@ retry:
 
 			const BlitItem& blit = _bs.advance();
 
-			TextureVK& src = m_textures[blit.m_src.idx];
-			TextureVK& dst = m_textures[blit.m_dst.idx];
+			if (blit.isTextureBlit)
+			{
+				TextureVK& src = m_textures[blit.m_src.idx];
+				TextureVK& dst = m_textures[blit.m_dst.idx];
 
-			src.setImageMemoryBarrier(m_commandBuffer, srcLayouts[item], VK_NULL_HANDLE != src.m_singleMsaaImage);
-			dst.setImageMemoryBarrier(m_commandBuffer, dstLayouts[item]);
+				src.setImageMemoryBarrier(m_commandBuffer, srcLayouts[item], VK_NULL_HANDLE != src.m_singleMsaaImage);
+				dst.setImageMemoryBarrier(m_commandBuffer, dstLayouts[item]);
+			}
 		}
 	}
 
