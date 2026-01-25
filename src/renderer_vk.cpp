@@ -8954,7 +8954,7 @@ retry:
 					
 					VkBufferCopy copyRegion;
 					copyRegion.srcOffset = copyInfo.m_srcOffset;
-					copyRegion.dstOffset = copyInfo.m_srcOffset;
+					copyRegion.dstOffset = copyInfo.m_dstOffset;
 					copyRegion.size      = size;
 
 					// note - Batch copy is possible with multiple copyRegions
